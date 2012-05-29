@@ -1,0 +1,16 @@
+.column {
+	width: 40%;
+	height: 100%;
+	display: inline-block;
+	vertical-align: top;
+	overflow-y: auto;
+}
+
+textarea {
+	width: 100%;
+	height: 60em;
+}
+
+#export {
+	margin-bottom: 1em;
+}
