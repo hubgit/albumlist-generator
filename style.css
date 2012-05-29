@@ -14,3 +14,11 @@ textarea {
 #export {
 	margin-bottom: 1em;
 }
+
+.error {
+	color: red;
+}
+
+.spotify a{
+	font-weight: bold;
+}

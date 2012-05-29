@@ -1,36 +1,55 @@
 window.BlobBuilder = window.BlobBuilder || window.WebKitBlobBuilder || window.MozBlobBuilder;
 window.URL = window.URL || window.webkitURL || window.MozURL;
 
-var tracks,
-	albums,
-	trackList = $("#trackList"),
-	albumList = $("#albumList"),
-	spotifyTrackList = $("#spotifyTrackList");
-
-var addTrack = function(artist, title, url) {
-	var trackContainer = $("<li/>", { "itemscope": "", "itemtype": "http://schema.org/MusicRecording", "class": "haudio" });
-
-	var trackNode = $("<a/>", { href: url, "itemprop": "url" });
-
-	$("<span/>", { "itemprop": "author", "text": artist, "class": "contributor" }).appendTo(trackNode);
-	$("<span> - </span>").appendTo(trackNode);
-	$("<span/>", { "itemprop": "name", "text": title, "class": "fn" }).appendTo(trackNode);
-
-	trackContainer.append(trackNode).appendTo(trackList);
-
-	spotifyTrackList.val(spotifyTrackList.val() + url + "\n");
-};
+var albumList = $("#albumList"),
+	spotifyList = $("#spotifyList");
 
 var addAlbum = function(album) {
-	var albumNode = $("<li/>", { "itemscope": "", "itemtype": "http://schema.org/MusicRecording", "class": "haudio" });
+	var albumContainer = $("<li/>", { "itemscope": "", "itemtype": "http://schema.org/MusicRecording", "class": "haudio" });
+
+	var albumNode = $("<a/>", { "itemprop": "url" });
 
 	$("<span/>", { "itemprop": "author", "text": album[0], "class": "contributor" }).appendTo(albumNode);
 	$("<span> - </span>").appendTo(albumNode);
 	$("<span/>", { "itemprop": "name", "text": album[1], "class": "fn" }).appendTo(albumNode);
 
-	albumNode.appendTo(albumList);
+	albumContainer.append(albumNode).appendTo(albumList);
+};
 
-	albums.push(album);
+var linkAlbum = function(albumNode, artist, title, url) {
+	albumNode.find("[itemProp='url']").attr("href", url);
+	spotifyList.val(spotifyList.val() + url + "\n");
+}
+
+var parseSpotifyAlbum = function(albumNode, album) {
+	linkAlbum(albumNode, album.artists[0].name, album.name, album.href);
+};
+
+var findSpotifyAlbum = function(albumNode, artist, title) {
+	var query = 'artist:"' + artist + '" album:"' + title + '"';
+
+	var data = localStorage[query];
+	if (typeof data != "undefined") return parseSpotifyAlbum(albumNode, JSON.parse(data));
+
+	$.getJSON("http://ws.spotify.com/search/1/album.json", { q: query }, function(data) {
+		if (!data.albums[0]) {
+			albumNode.addClass("error");
+			return;
+		}
+		localStorage[query] = JSON.stringify(data.albums[0]);
+		parseSpotifyAlbum(albumNode, data.albums[0]);
+	});
+};
+
+var findSpotifyAlbums = function() {
+	spotifyList.val("");
+	
+	albumList.find("[itemType='http://schema.org/MusicRecording']").each(function(index, item) {
+		var albumNode = $(item);
+		var artist = albumNode.find("[itemProp='author']").text();
+		var title = albumNode.find("[itemProp='name']").text();
+		findSpotifyAlbum(albumNode, artist, title);
+	});
 };
 
 var splitText = function() {
@@ -48,65 +67,9 @@ var splitText = function() {
 	return items;
 };
 
-var findSpotifyAlbum = function(item) {
-	var query = 'artist:"' + item[0] + '" album:"' + item[1] + '"';
-
-	var data = localStorage[query];
-	if (data) return lookupSpotifyAlbum(JSON.parse(data));
-
-	$.getJSON("http://ws.spotify.com/search/1/album.json", { q: query }, function(data) {
-		localStorage[query] = JSON.stringify(data);
-		lookupSpotifyAlbum(data);
-	});
-};
-
-var lookupSpotifyAlbum = function(data) {
-	console.log(data);
-	try {
-		var uri = data.albums[0].href;
-
-		var data = localStorage[uri];
-		if (data) return addTracks(JSON.parse(data));
-
-		$.getJSON("http://ws.spotify.com/lookup/1/.json", { uri: uri, extras: "track" }, function(data) {
-			localStorage[uri] = JSON.stringify(data.album);
-			addTracks(data.album);
-		});
-	}
-	catch (e) {
-
-	}
-};
-
-var addTracks = function(album) {
-	console.log(album.tracks);
-	console.log(album.tracks.length);
-
-	for (var i = 0; i < album.tracks.length; i++) {
-		console.log(i);
-		var track = album.tracks[i];
-		console.log(track);
-		addTrack(track.artists[0].name, track.name, track.href);
-	}
-}
-
-var updateTrackList = function() {
-	updateAlbumList();
-
-	tracks = [];
-
-	trackList.empty();
-	spotifyTrackList.empty();
-
-	if (!albums.length) return;
-
-	albums.forEach(findSpotifyAlbum);
-}
-
 var updateAlbumList = function() {
-	albums = [];
-
 	albumList.empty();
+	spotifyList.val("");
 
 	var items = splitText();
 	if (!items.length) return;
@@ -115,8 +78,9 @@ var updateAlbumList = function() {
 };
 
 $("#input").on("keyup", updateAlbumList).trigger("keyup");
-$("#lookup").on("click", updateTrackList);
+$("#lookup").on("click", findSpotifyAlbums);
 
+/*
 var addDownloadLink = function(tracks){
 	if (!tracks.length) return;
 
@@ -149,3 +113,4 @@ var addDownloadLink = function(tracks){
 	var link = $("<a/>", { "id": "export", "text": "Download XSPF", "href": URL.createObjectURL(blob), "download": "playlist.xspf", "class": "btn btn-large btn-primary" });
 	$("<div/>").append(link).insertBefore(trackList);
 }
+*/
